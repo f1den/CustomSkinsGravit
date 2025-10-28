@@ -1,0 +1,10 @@
+Manifest-Version: 1.0
+Specification-Title: hdskinssupportgravit
+Specification-Vendor: Nightly
+Specification-Version: 1
+Implementation-Title: HDSkinsSupportGravit
+Implementation-Version: 0.0.1
+Implementation-Vendor: Nightly
+Implementation-Timestamp: 2025-10-28T18:55:24+0300
+MixinConfigs: hdskinssupportgravit.mixins.json
+

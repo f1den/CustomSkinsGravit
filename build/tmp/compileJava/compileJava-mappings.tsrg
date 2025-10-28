@@ -1,0 +1,3 @@
+xyz/nightsync/hdskinssupportgravit/mixin/MagicMixin setNoAlpha (Lcom/mojang/blaze3d/platform/NativeImage;IIII)V m_118022_
+xyz/nightsync/hdskinssupportgravit/mixin/MagicMixin doNotchTransparencyHack (Lcom/mojang/blaze3d/platform/NativeImage;IIII)V m_118012_
+xyz/nightsync/hdskinssupportgravit/mixin/MagicMixin processLegacySkin (Lcom/mojang/blaze3d/platform/NativeImage;)Lcom/mojang/blaze3d/platform/NativeImage; m_118032_

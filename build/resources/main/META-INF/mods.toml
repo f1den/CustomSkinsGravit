@@ -1,0 +1,31 @@
+modLoader = "javafml"
+loaderVersion = "[47,)"
+license = "Unlicense"
+issueTrackerURL="https://github.com/f1den/CustomSkinsGravit/issues"
+
+[[mods]]
+modId = "hdskinssupportgravit"
+version = "${file.jarVersion}"
+displayName = "HDSkinsSupportGravit"
+# A URL to query for updates for this mod. See the JSON update specification https://docs.minecraftforge.net/en/latest/misc/updatechecker/
+#updateJSONURL="https://change.me.example.invalid/updates.json"
+displayURL = "https://nightsync.xyz"
+#logoFile="CustomSkinsGravit.png"
+authors = "Nightly"
+description = '''
+Mod that adds support for 2k skins for gravit launcher based on player UUID.
+'''
+
+[[dependencies.hdskinssupportgravit]]
+modId = "forge"
+mandatory = true
+versionRange = "[47,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.hdskinssupportgravit]]
+modId = "minecraft"
+mandatory = true
+versionRange = "[1.20.1,1.21)"
+ordering = "NONE"
+side = "BOTH"

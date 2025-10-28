@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "xyz.nightsync.hdskinssupportgravit.mixin",
+  "compatibilityLevel": "JAVA_8",
+  "refmap": "hdskinssupportgravit.refmap.json",
+  "mixins": [
+  ],
+  "client": [
+    "MagicMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
