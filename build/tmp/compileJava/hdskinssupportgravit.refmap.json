@@ -1,4 +1,14 @@
 {
-  "mappings": {},
-  "data": {}
+  "mappings": {
+    "xyz/nightsync/hdskinssupportgravit/mixin/CapeMagicMixin": {
+      "getCloakTextureLocation": "Lnet/minecraft/client/player/AbstractClientPlayer;m_108561_()Lnet/minecraft/resources/ResourceLocation;"
+    }
+  },
+  "data": {
+    "searge": {
+      "xyz/nightsync/hdskinssupportgravit/mixin/CapeMagicMixin": {
+        "getCloakTextureLocation": "Lnet/minecraft/client/player/AbstractClientPlayer;m_108561_()Lnet/minecraft/resources/ResourceLocation;"
+      }
+    }
+  }
 }

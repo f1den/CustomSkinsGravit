@@ -4,6 +4,8 @@
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/CustomSkinsGravit.main.iml" filepath="$PROJECT_DIR$/.idea/modules/CustomSkinsGravit.main.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/CustomSkinsGravit.test.iml" filepath="$PROJECT_DIR$/.idea/modules/CustomSkinsGravit.test.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/HDSkinsSupportGravit.main.iml" filepath="$PROJECT_DIR$/.idea/modules/HDSkinsSupportGravit.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/HDSkinsSupportGravit.test.iml" filepath="$PROJECT_DIR$/.idea/modules/HDSkinsSupportGravit.test.iml" />
     </modules>
   </component>
 </project>

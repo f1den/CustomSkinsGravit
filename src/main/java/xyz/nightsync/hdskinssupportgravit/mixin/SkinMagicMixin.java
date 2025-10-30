@@ -7,7 +7,7 @@ import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 
 @Mixin(HttpTexture.class)
-public class MagicMixin {
+public class SkinMagicMixin {
 
     // Достаём private static методы целевого класса
     @Shadow private static void setNoAlpha(NativeImage img, int x1, int y1, int x2, int y2) {}
