@@ -24,9 +24,14 @@ import static java.lang.System.arraycopy;
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ *
+ * Modified by ChatGPT to free heap and vram.
  */
 
 /**
+ * Modified by ChatGPT to free heap and vram.
+ *
  * <p>
  * A decoder capable of processing a GIF data stream to render the graphics
  * contained in it. This implementation follows the official
@@ -189,6 +194,9 @@ public final class GifDecoder {
         private final BitReader bits = new BitReader();
         private final CodeTable codes = new CodeTable();
         private Graphics2D g;
+        // CUSTOM
+        private boolean cacheFrames = true;
+        public void setCacheFrames(boolean b) { cacheFrames = b; }
 
         private int[] decode(final GifFrame fr, final int[] activeColTbl) {
             codes.init(fr, activeColTbl, bits);
@@ -265,6 +273,26 @@ public final class GifDecoder {
             return dest; // All pixel lines have now been rearranged
         }
 
+        // CUSTOM
+        public BufferedImage renderFrameNoCache(final int index) {
+            if (img == null) {
+                img = new BufferedImage(w, h, 2);
+                g = img.createGraphics();
+                g.setBackground(new Color(0, true));
+            }
+            GifFrame fr = frames.get(index);
+            // нарисуем все до текущего (инкрементально O(1) на последовательных вызовах)
+            for (int i = 0; i <= index; i++) {
+                GifFrame f = frames.get(i);
+                if (f.img == null) drawFrame(f);
+            }
+            BufferedImage out = fr.img;
+            if (!cacheFrames) {         // << если кэш выключен — выбросить ссылку
+                fr.img = null;
+            }
+            return out;
+        }
+
         private void drawFrame(final GifFrame fr) {
             // Determine the color table that will be active for this frame
             final int[] activeColTbl = fr.hasLocColTbl ? fr.localColTbl : globalColTbl;
@@ -337,6 +365,8 @@ public final class GifDecoder {
         }
 
         /**
+         * Modified by ChatGPT to free heap and vram.
+         *
          * @param index Index of the frame to return as image, starting from 0.
          *              For incremental calls such as [0, 1, 2, ...] the method's
          *              run time is O(1) as only one frame is drawn per call. For
@@ -348,14 +378,13 @@ public final class GifDecoder {
          * @return A BufferedImage for the specified frame.
          */
         public BufferedImage getFrame(final int index) {
-            if (img == null) { // Init
-                img = new BufferedImage(w, h, 2); // 2 = ARGB
+            if (img == null) {
+                img = new BufferedImage(w, h, 2);
                 g = img.createGraphics();
-                g.setBackground(new Color(0, true)); // Transparent color
+                g.setBackground(new Color(0, true));
             }
             GifFrame fr = frames.get(index);
             if (fr.img == null) {
-                // Draw all frames until and including the requested frame
                 for (int i = 0; i <= index; i++) {
                     fr = frames.get(i);
                     if (fr.img == null) {

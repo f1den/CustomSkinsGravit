@@ -1,10 +1,12 @@
 package xyz.nightsync.hdskinssupportgravit.client;
 
 import com.mojang.blaze3d.platform.NativeImage;
+import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.ResourceLocation;
 
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -25,7 +27,7 @@ public final class CapeManager {
     private static final int MAX_W = 1024;
     private static final int MAX_H = 1024;
     private static final int MAX_FRAMES = 120;                 // максимум кадров
-    private static final long MAX_TOTAL_PIXELS = 8_388_608L;   // суммарно по всем кадрам (8M)
+    private static final long MAX_TOTAL_PIXELS = 32_000_000L;   // суммарно по всем кадрам (32M)
     private static final int MAX_BYTES = 10 * 1024 * 1024;     // максимум байт файла (10 МБ)
     private static final int MIN_DELAY_MS = 15;                // минимальная задержка между кадрами
     private static final int MAX_DELAY_MS = 5000;              // максимальная задержка между кадрами
@@ -89,59 +91,53 @@ public final class CapeManager {
     }
 
     private static void loadGifCape(CapeData data, byte[] bytes) throws IOException {
+        // 1) Декод и подготовка на любом (IO) потоке: БЕЗ GL
+        GifDecoder.GifImage gif = GifDecoder.read(new ByteArrayInputStream(bytes));
+        // если добавлял режим без кэша кадров — задействуй
         try {
-            GifDecoder.GifImage gif = GifDecoder.read(new ByteArrayInputStream(bytes));
+            gif.getClass().getMethod("setCacheFrames", boolean.class).invoke(gif, false);
+        } catch (Throwable ignored) {}
 
-            int w = gif.getWidth();
-            int h = gif.getHeight();
-            if (w <= 0 || h <= 0 || w > MAX_W || h > MAX_H) { data.setStatic(null); return; }
+        int w = gif.getWidth();
+        int h = gif.getHeight();
+        if (w <= 0 || h <= 0 || w > MAX_W || h > MAX_H) { data.setStatic(null); return; }
 
-            int framesAll = gif.getFrameCount();
-            if (framesAll <= 0) { data.setStatic(null); return; }
+        int framesAll = gif.getFrameCount();
+        if (framesAll <= 0) { data.setStatic(null); return; }
 
-            int frames = Math.min(framesAll, MAX_FRAMES);
-            long totalPx = (long) w * h * frames;
-            if (totalPx > MAX_TOTAL_PIXELS) { data.setStatic(null); return; }
+        // Бюджет по пикселям (под стриминг можно держать больше)
+        long totalAll = 1L * w * h * framesAll;
+        int frames = framesAll;
+        if (totalAll > MAX_TOTAL_PIXELS) {
+            frames = (int) Math.max(1, MAX_TOTAL_PIXELS / Math.max(1L, w * (long) h));
+        }
+        frames = Math.min(frames, MAX_FRAMES);
 
-            List<CapeFrame> list = new ArrayList<>(frames);
+        // Подготовим массив задержек (ускорение SPEED_MULTIPLIER, клампы)
+        int[] delaysMs = new int[frames];
+        for (int i = 0; i < frames; i++) {
+            int delayCs = Math.max(1, gif.getDelay(i));     // сотые секунды
+            int rawMs   = delayCs * 10;
+            int clamped = Math.max(MIN_DELAY_MS, Math.min(MAX_DELAY_MS, rawMs));
+            delaysMs[i] = (int) Math.max(MIN_DELAY_MS, Math.round(clamped / SPEED_MULTIPLIER));
+        }
 
-            for (int i = 0; i < frames; i++) {
-                java.awt.image.BufferedImage bi = gif.getFrame(i);
-
-                NativeImage ni = new NativeImage(NativeImage.Format.RGBA, w, h, true);
-                int[] argb = new int[w * h];
-                bi.getRGB(0, 0, w, h, argb, 0, w);
-
-                for (int y = 0; y < h; y++) {
-                    for (int x = 0; x < w; x++) {
-                        int p = argb[y * w + x];
-                        int a = (p >>> 24) & 0xFF;
-                        int r = (p >>> 16) & 0xFF;
-                        int g = (p >>> 8) & 0xFF;
-                        int b = (p) & 0xFF;
-                        int abgr = (a << 24) | (b << 16) | (g << 8) | r;
-                        ni.setPixelRGBA(x, y, abgr);
-                    }
-                }
-
-                DynamicTexture dyn = new DynamicTexture(ni);
-                ResourceLocation id = rl("cape/" + data.uuid + "/f" + i);
+        // 2) ВСЁ, ЧТО ТРОГАЕТ GL/RenderSystem — ТОЛЬКО НА render-потоке:
+        RenderSystem.recordRenderCall(() -> {
+            try {
+                // одна текстура под всю анимацию (стриминг кадров в неё)
+                DynamicTexture dyn = new DynamicTexture(w, h, true);
+                ResourceLocation id = rl("cape/" + data.uuid + "/anim");
                 Minecraft.getInstance().getTextureManager().register(id, dyn);
 
-                int delayCs = Math.max(1, gif.getDelay(i));      // hundredths (cs)
-                int rawMs   = delayCs * 10;
-                int clamped = Math.max(MIN_DELAY_MS, Math.min(MAX_DELAY_MS, rawMs));
-                int spedUp  = (int)Math.max(MIN_DELAY_MS, Math.round(clamped / SPEED_MULTIPLIER));
-
-                list.add(new CapeFrame(id, spedUp));
+                // ВНИМАНИЕ: внутри setAnimatedStreaming НИКАКИХ GL-вызовов!
+                // только сохранить gif, dyn, id, delays и выставить индексы/таймер.
+                data.setAnimatedStreaming(gif, dyn, id, delaysMs);
+            } catch (Throwable t) {
+                t.printStackTrace();
+                data.setStatic(null);
             }
-
-            data.setAnimated(list);
-        } catch (OutOfMemoryError oom) {
-            data.setStatic(null);
-        } catch (Throwable t) {
-            data.setStatic(null);
-        }
+        });
     }
 
     private static byte[] httpGet(String url) throws IOException {
@@ -184,37 +180,81 @@ public final class CapeManager {
 
     private static final class CapeData {
         final UUID uuid;
-        private volatile ResourceLocation current;
-        private List<CapeFrame> frames;
+
+        // статический плащ
+        private ResourceLocation staticTex;
+
+        // стриминг
+        private GifDecoder.GifImage gif;
+        private DynamicTexture dyn;
+        private ResourceLocation dynId;
+        private int[] delays;
         private int idx;
-        private long nextAtMs;
+        private long nextAt;
 
         CapeData(UUID uuid) { this.uuid = uuid; }
 
         void setStatic(ResourceLocation id) {
-            this.frames = null;
-            this.current = id;
+            this.staticTex = id;
+            this.gif = null; this.dyn = null; this.dynId = null; this.delays = null;
         }
 
-        void setAnimated(List<CapeFrame> frames) {
-            this.frames = frames;
-            this.idx = 0;
-            this.current = frames.get(0).id();
-            this.nextAtMs = System.currentTimeMillis() + frames.get(0).delayMs();
+        void setAnimatedStreaming(GifDecoder.GifImage gif, DynamicTexture dyn, ResourceLocation id, int[] delays) {
+            this.gif = gif;
+            this.dyn = dyn;
+            this.dynId = id;
+            this.delays = delays;
+            this.idx = -1; // чтобы сразу отрисовать 0-й кадр
+            this.nextAt = 0L;
         }
 
         ResourceLocation currentTexture() {
-            return current;
+            if (dynId != null) return dynId;
+            return staticTex;
         }
 
         void tick(long now) {
-            if (frames == null || frames.isEmpty() || current == null) return;
-            if (now >= nextAtMs) {
-                idx = (idx + 1) % frames.size();
-                CapeFrame f = frames.get(idx);
-                current = f.id();
-                nextAtMs = now + Math.max(MIN_DELAY_MS, f.delayMs());
+            if (dyn == null || gif == null || delays == null) return;
+
+            if (idx == -1 || now >= nextAt) {
+                idx = (idx + 1) % delays.length;
+
+                BufferedImage bi = gif.renderFrameNoCache(idx);
+                if (bi != null) {
+                    NativeImage ni = dyn.getPixels(); // CPU-буфер
+                    int w = ni.getWidth(), h = ni.getHeight();
+                    int[] argb = new int[w * h];
+                    bi.getRGB(0, 0, w, h, argb, 0, w);
+
+                    // заполняем пиксели (CPU) — можно на любом потоке
+                    for (int y = 0; y < h; y++) {
+                        int row = y * w;
+                        for (int x = 0; x < w; x++) {
+                            int p = argb[row + x];
+                            int a = (p >>> 24) & 0xFF;
+                            int r = (p >>> 16) & 0xFF;
+                            int g = (p >>> 8) & 0xFF;
+                            int b = (p) & 0xFF;
+                            int abgr = (a << 24) | (b << 16) | (g << 8) | r;
+                            ni.setPixelRGBA(x, y, abgr);
+                        }
+                    }
+
+                    // ПЕРЕНОС НА GPU — строго на render-потоке
+                    RenderSystem.recordRenderCall(dyn::upload);
+
+                    bi.flush();
+                }
+
+                nextAt = now + Math.max(MIN_DELAY_MS, delays[idx]);
             }
+        }
+
+        void releaseAll() {
+            var tm = Minecraft.getInstance().getTextureManager();
+            if (dynId != null) tm.release(dynId);
+            if (staticTex != null) tm.release(staticTex);
+            dynId = null; dyn = null; staticTex = null; gif = null; delays = null;
         }
     }
 
